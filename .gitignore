@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.local
+.gemini-key
+doce_lucro_db.json
+.tools/
