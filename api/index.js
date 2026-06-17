@@ -32,6 +32,7 @@ var __decorateClass = (decorators, target, key, kind) => {
 
 // vercel/handler.ts
 var import_reflect_metadata3 = require("reflect-metadata");
+var import_serverless_http = __toESM(require("serverless-http"));
 
 // server.ts
 var import_reflect_metadata2 = require("reflect-metadata");
@@ -62,15 +63,15 @@ if (import_fs.default.existsSync(geminiKeyFile)) {
 
 // server.ts
 var import_cors = __toESM(require("cors"));
-var import_express2 = __toESM(require("express"));
+var import_express3 = __toESM(require("express"));
 var import_swagger_ui_express = __toESM(require("swagger-ui-express"));
 
 // routes.ts
-var import_express = require("express");
+var import_express2 = require("express");
 
 // database/data-source.ts
 var import_reflect_metadata = require("reflect-metadata");
-var import_typeorm9 = require("typeorm");
+var import_typeorm11 = require("typeorm");
 
 // entities/Product.ts
 var import_typeorm = require("typeorm");
@@ -361,6 +362,67 @@ Order = __decorateClass([
   (0, import_typeorm8.Entity)("orders")
 ], Order);
 
+// entities/User.ts
+var import_typeorm9 = require("typeorm");
+var User = class {
+};
+__decorateClass([
+  (0, import_typeorm9.PrimaryGeneratedColumn)()
+], User.prototype, "id", 2);
+__decorateClass([
+  (0, import_typeorm9.Column)({ type: "varchar", length: 32, unique: true })
+], User.prototype, "username", 2);
+__decorateClass([
+  (0, import_typeorm9.Column)({ type: "varchar", length: 255 })
+], User.prototype, "password_hash", 2);
+__decorateClass([
+  (0, import_typeorm9.Column)({ type: "varchar", length: 255 })
+], User.prototype, "name", 2);
+__decorateClass([
+  (0, import_typeorm9.Column)({ type: "varchar", length: 255 })
+], User.prototype, "email", 2);
+__decorateClass([
+  (0, import_typeorm9.Column)({ type: "varchar", length: 16, default: "operator" })
+], User.prototype, "role", 2);
+__decorateClass([
+  (0, import_typeorm9.Column)({ type: "boolean", default: true })
+], User.prototype, "active", 2);
+__decorateClass([
+  (0, import_typeorm9.CreateDateColumn)({ type: "timestamptz" })
+], User.prototype, "created_at", 2);
+User = __decorateClass([
+  (0, import_typeorm9.Entity)("users")
+], User);
+
+// entities/Customer.ts
+var import_typeorm10 = require("typeorm");
+var Customer = class {
+};
+__decorateClass([
+  (0, import_typeorm10.PrimaryGeneratedColumn)()
+], Customer.prototype, "id", 2);
+__decorateClass([
+  (0, import_typeorm10.Column)({ type: "varchar", length: 255 })
+], Customer.prototype, "name", 2);
+__decorateClass([
+  (0, import_typeorm10.Column)({ type: "varchar", length: 32 })
+], Customer.prototype, "phone", 2);
+__decorateClass([
+  (0, import_typeorm10.Column)({ type: "varchar", length: 255, nullable: true })
+], Customer.prototype, "email", 2);
+__decorateClass([
+  (0, import_typeorm10.Column)({ type: "varchar", length: 512, nullable: true })
+], Customer.prototype, "address", 2);
+__decorateClass([
+  (0, import_typeorm10.Column)({ type: "text", nullable: true })
+], Customer.prototype, "notes", 2);
+__decorateClass([
+  (0, import_typeorm10.CreateDateColumn)({ type: "timestamptz" })
+], Customer.prototype, "created_at", 2);
+Customer = __decorateClass([
+  (0, import_typeorm10.Entity)("customers")
+], Customer);
+
 // database/data-source.ts
 function getDatabaseUrl() {
   return process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/gestify";
@@ -380,7 +442,7 @@ var poolExtra = {
 if (sslConfig) {
   poolExtra.ssl = { rejectUnauthorized: false };
 }
-var AppDataSource = new import_typeorm9.DataSource({
+var AppDataSource = new import_typeorm11.DataSource({
   type: "postgres",
   url: getDatabaseUrl(),
   synchronize: !process.env.VERCEL,
@@ -395,7 +457,9 @@ var AppDataSource = new import_typeorm9.DataSource({
     SalesHistory,
     Promotion,
     Supplier,
-    Order
+    Order,
+    User,
+    Customer
   ]
 });
 
@@ -800,6 +864,52 @@ async function updateOrder(id, data) {
 }
 async function deleteOrder(id) {
   await AppDataSource.getRepository(Order).delete(id);
+}
+function customerToPlain(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    email: c.email,
+    address: c.address,
+    notes: c.notes,
+    created_at: c.created_at
+  };
+}
+async function findAllCustomers() {
+  const rows = await AppDataSource.getRepository(Customer).find({
+    order: { name: "ASC" }
+  });
+  return rows.map(customerToPlain);
+}
+async function createCustomer(data) {
+  const repo = AppDataSource.getRepository(Customer);
+  const saved = await repo.save(
+    repo.create({
+      name: data.name.trim(),
+      phone: data.phone.trim(),
+      email: data.email?.trim() || null,
+      address: data.address?.trim() || null,
+      notes: data.notes?.trim() || null
+    })
+  );
+  return customerToPlain(saved);
+}
+async function updateCustomer(id, data) {
+  const repo = AppDataSource.getRepository(Customer);
+  const row = await repo.findOneBy({ id });
+  if (!row) return null;
+  if (data.name !== void 0) row.name = data.name.trim();
+  if (data.phone !== void 0) row.phone = data.phone.trim();
+  if (data.email !== void 0) row.email = data.email?.trim() || null;
+  if (data.address !== void 0) row.address = data.address?.trim() || null;
+  if (data.notes !== void 0) row.notes = data.notes?.trim() || null;
+  const saved = await repo.save(row);
+  return customerToPlain(saved);
+}
+async function deleteCustomer(id) {
+  const result = await AppDataSource.getRepository(Customer).delete(id);
+  return (result.affected ?? 0) > 0;
 }
 
 // gemini.ts
@@ -1536,16 +1646,405 @@ async function runAutomationCycle() {
   return logs;
 }
 
-// routes.ts
+// routes/auth.routes.ts
+var import_express = require("express");
+
+// services/auth.service.ts
+var import_crypto = __toESM(require("crypto"));
+var TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+function getJwtSecret() {
+  return process.env.JWT_SECRET || process.env.ADMIN_PASSWORD || "gestify-dev-secret-change-in-production";
+}
+function hashPassword(password) {
+  const salt = import_crypto.default.randomBytes(16).toString("hex");
+  const hash = import_crypto.default.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+function verifyPassword(password, stored) {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const test = import_crypto.default.scryptSync(password, salt, 64).toString("hex");
+  try {
+    return import_crypto.default.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(test, "hex"));
+  } catch {
+    return false;
+  }
+}
+function toAuthUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    active: user.active
+  };
+}
+function signToken(user) {
+  const payload = {
+    ...user,
+    exp: Date.now() + TOKEN_TTL_MS
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = import_crypto.default.createHmac("sha256", getJwtSecret()).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+function verifyToken(token) {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [body, sig] = parts;
+  const expected = import_crypto.default.createHmac("sha256", getJwtSecret()).update(body).digest("base64url");
+  try {
+    if (!import_crypto.default.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(
+      Buffer.from(body, "base64url").toString("utf8")
+    );
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    if (!payload.id || !payload.username || !payload.role) return null;
+    return {
+      id: payload.id,
+      username: payload.username,
+      name: payload.name,
+      email: payload.email,
+      role: payload.role
+    };
+  } catch {
+    return null;
+  }
+}
+async function authenticateUser(username, password) {
+  const repo = AppDataSource.getRepository(User);
+  const user = await repo.findOne({ where: { username: username.trim() } });
+  if (!user || !user.active) return null;
+  if (!verifyPassword(password, user.password_hash)) return null;
+  return toAuthUser(user);
+}
+async function createUser(data) {
+  const repo = AppDataSource.getRepository(User);
+  const username = data.username.trim();
+  const existing = await repo.findOne({ where: { username } });
+  if (existing) {
+    throw new Error("Usu\xE1rio j\xE1 cadastrado.");
+  }
+  const user = repo.create({
+    username,
+    password_hash: hashPassword(data.password),
+    name: data.name.trim(),
+    email: data.email.trim(),
+    role: data.role,
+    active: true
+  });
+  const saved = await repo.save(user);
+  return toAuthUser(saved);
+}
+async function listUsers() {
+  const users = await AppDataSource.getRepository(User).find({
+    order: { created_at: "DESC" }
+  });
+  return users.map(toAuthUser);
+}
+async function updateUser(id, data) {
+  const repo = AppDataSource.getRepository(User);
+  const user = await repo.findOne({ where: { id } });
+  if (!user) return null;
+  if (data.name !== void 0) user.name = data.name.trim();
+  if (data.email !== void 0) user.email = data.email.trim();
+  if (data.role !== void 0) user.role = data.role;
+  if (data.active !== void 0) user.active = data.active;
+  if (data.password) user.password_hash = hashPassword(data.password);
+  const saved = await repo.save(user);
+  return toAuthUser(saved);
+}
+async function deleteUser(id) {
+  const repo = AppDataSource.getRepository(User);
+  const user = await repo.findOne({ where: { id } });
+  if (!user) return false;
+  const adminCount = await repo.count({ where: { role: "admin", active: true } });
+  if (user.role === "admin" && adminCount <= 1) {
+    throw new Error("N\xE3o \xE9 poss\xEDvel remover o \xFAltimo administrador ativo.");
+  }
+  await repo.remove(user);
+  return true;
+}
+async function seedDefaultAdmin() {
+  const repo = AppDataSource.getRepository(User);
+  if (await repo.count() > 0) return;
+  const username = process.env.ADMIN_USERNAME || "1164";
+  const password = process.env.ADMIN_PASSWORD || "19735";
+  await repo.save(
+    repo.create({
+      username,
+      password_hash: hashPassword(password),
+      name: "Administrador",
+      email: "admin@gestify.local",
+      role: "admin",
+      active: true
+    })
+  );
+  console.log("[seed] Administrador padr\xE3o criado (username:", username, ")");
+}
+
+// middleware/auth.middleware.ts
+function extractToken(req) {
+  const header = req.headers.authorization;
+  if (header?.startsWith("Bearer ")) {
+    return header.slice(7).trim();
+  }
+  return null;
+}
+function requireAuth(req, res, next) {
+  const token = extractToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria." });
+    return;
+  }
+  const user = verifyToken(token);
+  if (!user) {
+    res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada." });
+    return;
+  }
+  req.user = user;
+  next();
+}
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria." });
+      return;
+    }
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({ error: "Permiss\xE3o insuficiente." });
+      return;
+    }
+    next();
+  };
+}
+
+// routes/auth.routes.ts
 var router = (0, import_express.Router)();
+function validateUsername(username) {
+  const u = username.trim();
+  if (!/^\d{4,8}$/.test(u)) {
+    return "Usu\xE1rio deve ter entre 4 e 8 d\xEDgitos num\xE9ricos.";
+  }
+  return null;
+}
+function validatePassword(password) {
+  if (password.length < 5) {
+    return "Senha deve ter no m\xEDnimo 5 caracteres.";
+  }
+  return null;
+}
+router.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Informe usu\xE1rio e senha." });
+    }
+    const user = await authenticateUser(String(username), String(password));
+    if (!user) {
+      return res.status(401).json({ error: "Usu\xE1rio ou senha incorretos." });
+    }
+    const token = signToken(user);
+    res.json({ token, user });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: message });
+  }
+});
+router.post("/register", async (req, res) => {
+  try {
+    const { username, password, name, email } = req.body;
+    if (!username || !password || !name || !email) {
+      return res.status(400).json({ error: "Preencha todos os campos." });
+    }
+    const userError = validateUsername(String(username));
+    if (userError) return res.status(400).json({ error: userError });
+    const passError = validatePassword(String(password));
+    if (passError) return res.status(400).json({ error: passError });
+    if (!String(email).includes("@")) {
+      return res.status(400).json({ error: "E-mail inv\xE1lido." });
+    }
+    const userRepo = AppDataSource.getRepository(User);
+    const totalUsers = await userRepo.count();
+    const allowPublic = process.env.ALLOW_PUBLIC_SIGNUP === "true" || totalUsers === 0;
+    if (!allowPublic) {
+      return res.status(403).json({
+        error: "Cadastro p\xFAblico desativado. Solicite acesso ao administrador."
+      });
+    }
+    const role = totalUsers === 0 ? "admin" : "operator";
+    const user = await createUser({
+      username: String(username),
+      password: String(password),
+      name: String(name),
+      email: String(email),
+      role
+    });
+    const token = signToken(user);
+    res.status(201).json({ token, user });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: message });
+  }
+});
+router.get("/me", requireAuth, (req, res) => {
+  res.json({ user: req.user });
+});
+router.get("/users", requireAuth, requireRole("admin"), async (_req, res) => {
+  try {
+    const users = await listUsers();
+    res.json(users);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: message });
+  }
+});
+router.post("/users", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const { username, password, name, email, role } = req.body;
+    if (!username || !password || !name || !email) {
+      return res.status(400).json({ error: "Preencha todos os campos." });
+    }
+    const userError = validateUsername(String(username));
+    if (userError) return res.status(400).json({ error: userError });
+    const passError = validatePassword(String(password));
+    if (passError) return res.status(400).json({ error: passError });
+    if (!String(email).includes("@")) {
+      return res.status(400).json({ error: "E-mail inv\xE1lido." });
+    }
+    const userRole = role === "admin" ? "admin" : "operator";
+    const user = await createUser({
+      username: String(username),
+      password: String(password),
+      name: String(name),
+      email: String(email),
+      role: userRole
+    });
+    res.status(201).json(user);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: message });
+  }
+});
+router.put("/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, email, role, active, password } = req.body;
+    const updated = await updateUser(id, {
+      name: name !== void 0 ? String(name) : void 0,
+      email: email !== void 0 ? String(email) : void 0,
+      role: role === "admin" || role === "operator" ? role : void 0,
+      active: active !== void 0 ? !!active : void 0,
+      password: password ? String(password) : void 0
+    });
+    if (!updated) return res.status(404).json({ error: "Usu\xE1rio n\xE3o encontrado." });
+    res.json(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: message });
+  }
+});
+router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (req.user?.id === id) {
+      return res.status(400).json({ error: "Voc\xEA n\xE3o pode remover sua pr\xF3pria conta." });
+    }
+    await deleteUser(id);
+    res.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: message });
+  }
+});
+var auth_routes_default = router;
+
+// routes.ts
+var router2 = (0, import_express2.Router)();
 function getThemeParam(req) {
   const theme = req.query.theme;
   return typeof theme === "string" ? theme : "";
 }
-router.get("/settings/gemini-status", (_req, res) => {
+router2.use("/auth", auth_routes_default);
+router2.get("/products", async (req, res) => {
+  try {
+    if (isVarejoTheme(getThemeParam(req))) {
+      return res.json([...VAREJO_PRODUCTS].sort((a, b) => (b.id ?? 0) - (a.id ?? 0)));
+    }
+    res.json(await findAllProducts());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router2.post("/orders", async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body.customer_name || !body.type) {
+      return res.status(400).json({ error: "Nome do cliente e tipo de pedido s\xE3o obrigat\xF3rios" });
+    }
+    const newOrder = await createOrder(body);
+    res.status(201).json(newOrder);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router2.use(requireAuth);
+router2.get("/customers", async (_req, res) => {
+  try {
+    res.json(await findAllCustomers());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router2.post("/customers", async (req, res) => {
+  try {
+    const { name, phone, email, address, notes } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ error: "Nome e telefone s\xE3o obrigat\xF3rios." });
+    }
+    const customer = await createCustomer({
+      name: String(name),
+      phone: String(phone),
+      email: email ? String(email) : null,
+      address: address ? String(address) : null,
+      notes: notes ? String(notes) : null
+    });
+    res.status(201).json(customer);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+router2.put("/customers/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const updated = await updateCustomer(id, req.body);
+    if (!updated) return res.status(404).json({ error: "Cliente n\xE3o encontrado." });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+router2.delete("/customers/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const ok = await deleteCustomer(id);
+    if (!ok) return res.status(404).json({ error: "Cliente n\xE3o encontrado." });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router2.get("/settings/gemini-status", (_req, res) => {
   res.json({ configured: isGeminiConfigured() });
 });
-router.post("/settings/gemini-key", (req, res) => {
+router2.post("/settings/gemini-key", requireRole("admin"), (req, res) => {
   try {
     const { apiKey } = req.body;
     if (!apiKey || typeof apiKey !== "string") {
@@ -1557,7 +2056,7 @@ router.post("/settings/gemini-key", (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
-router.get("/dashboard", async (req, res) => {
+router2.get("/dashboard", async (req, res) => {
   try {
     if (isVarejoTheme(getThemeParam(req))) {
       return res.json(getVarejoDashboard());
@@ -1568,17 +2067,7 @@ router.get("/dashboard", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/products", async (req, res) => {
-  try {
-    if (isVarejoTheme(getThemeParam(req))) {
-      return res.json([...VAREJO_PRODUCTS].sort((a, b) => (b.id ?? 0) - (a.id ?? 0)));
-    }
-    res.json(await findAllProducts());
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-router.post("/products", async (req, res) => {
+router2.post("/products", async (req, res) => {
   try {
     const {
       sku,
@@ -1622,7 +2111,7 @@ router.post("/products", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.put("/products/:id", async (req, res) => {
+router2.put("/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -1664,7 +2153,7 @@ router.put("/products/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.delete("/products/:id", async (req, res) => {
+router2.delete("/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await deleteProduct(Number(id));
@@ -1673,14 +2162,14 @@ router.delete("/products/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/recipes", async (_req, res) => {
+router2.get("/recipes", async (_req, res) => {
   try {
     res.json(await findAllRecipesHydrated());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/recipes", async (req, res) => {
+router2.post("/recipes", async (req, res) => {
   try {
     const {
       id,
@@ -1712,7 +2201,7 @@ router.post("/recipes", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.delete("/recipes/:id", async (req, res) => {
+router2.delete("/recipes/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await deleteRecipe(Number(id));
@@ -1721,14 +2210,14 @@ router.delete("/recipes/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/invisible-costs", async (_req, res) => {
+router2.get("/invisible-costs", async (_req, res) => {
   try {
     res.json(await getInvisibleCostsDict());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/invisible-costs", async (req, res) => {
+router2.post("/invisible-costs", requireRole("admin"), async (req, res) => {
   try {
     const costs = req.body;
     await upsertInvisibleCosts(costs);
@@ -1737,7 +2226,7 @@ router.post("/invisible-costs", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/promotions", async (req, res) => {
+router2.get("/promotions", async (req, res) => {
   try {
     if (isVarejoTheme(getThemeParam(req))) {
       return res.json(VAREJO_PROMOTIONS);
@@ -1747,7 +2236,7 @@ router.get("/promotions", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/promotions/:id/apply", async (req, res) => {
+router2.post("/promotions/:id/apply", async (req, res) => {
   try {
     const { id } = req.params;
     const { active } = req.body;
@@ -1757,7 +2246,7 @@ router.post("/promotions/:id/apply", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/promotions", async (req, res) => {
+router2.post("/promotions", async (req, res) => {
   try {
     const { title, subtitle, type, discount, recovery, status } = req.body;
     const newPromo = await createPromotion({
@@ -1773,7 +2262,7 @@ router.post("/promotions", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/marketing/generate", async (req, res) => {
+router2.post("/marketing/generate", async (req, res) => {
   try {
     const { context, type } = req.body;
     if (!context) {
@@ -1816,7 +2305,7 @@ Formato do JSON de retorno:
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/suppliers", async (req, res) => {
+router2.get("/suppliers", async (req, res) => {
   try {
     if (isVarejoTheme(getThemeParam(req))) {
       return res.json(VAREJO_SUPPLIERS);
@@ -1826,7 +2315,7 @@ router.get("/suppliers", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/suppliers", async (req, res) => {
+router2.post("/suppliers", async (req, res) => {
   try {
     const { name, contact, category, active, items } = req.body;
     if (!name) {
@@ -1844,7 +2333,7 @@ router.post("/suppliers", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.put("/suppliers/:id", async (req, res) => {
+router2.put("/suppliers/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { name, contact, category, active, items } = req.body;
@@ -1863,7 +2352,7 @@ router.put("/suppliers/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.delete("/suppliers/:id", async (req, res) => {
+router2.delete("/suppliers/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await deleteSupplier(Number(id));
@@ -1872,7 +2361,7 @@ router.delete("/suppliers/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/orders", async (req, res) => {
+router2.get("/orders", async (req, res) => {
   try {
     if (isVarejoTheme(getThemeParam(req))) {
       return res.json([...VAREJO_ORDERS].sort((a, b) => (b.id ?? 0) - (a.id ?? 0)));
@@ -1882,19 +2371,7 @@ router.get("/orders", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/orders", async (req, res) => {
-  try {
-    const body = req.body;
-    if (!body.customer_name || !body.type) {
-      return res.status(400).json({ error: "Nome do cliente e tipo de pedido s\xE3o obrigat\xF3rios" });
-    }
-    const newOrder = await createOrder(body);
-    res.status(201).json(newOrder);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-router.put("/orders/:id/status", async (req, res) => {
+router2.put("/orders/:id/status", async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -1907,7 +2384,7 @@ router.put("/orders/:id/status", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.put("/orders/:id", async (req, res) => {
+router2.put("/orders/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const updated = await updateOrder(Number(id), req.body);
@@ -1916,7 +2393,7 @@ router.put("/orders/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.delete("/orders/:id", async (req, res) => {
+router2.delete("/orders/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await deleteOrder(Number(id));
@@ -1925,7 +2402,7 @@ router.delete("/orders/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.get("/assistant/insights", async (_req, res) => {
+router2.get("/assistant/insights", async (_req, res) => {
   try {
     const [insights, action_cards] = await Promise.all([
       buildInsights(),
@@ -1936,7 +2413,7 @@ router.get("/assistant/insights", async (_req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/assistant/chat", async (req, res) => {
+router2.post("/assistant/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
     if (!message || typeof message !== "string") {
@@ -1951,7 +2428,7 @@ router.post("/assistant/chat", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/automation/run", async (_req, res) => {
+router2.post("/automation/run", requireRole("admin"), async (_req, res) => {
   try {
     const logs = await runAutomationCycle();
     res.json({ success: true, logs });
@@ -1959,7 +2436,7 @@ router.post("/automation/run", async (_req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.patch("/recipes/:id/price", async (req, res) => {
+router2.patch("/recipes/:id/price", async (req, res) => {
   try {
     const id = Number(req.params.id);
     const { final_price } = req.body;
@@ -1981,7 +2458,7 @@ router.patch("/recipes/:id/price", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-var routes_default = router;
+var routes_default = router2;
 
 // swagger.ts
 var import_swagger_jsdoc = __toESM(require("swagger-jsdoc"));
@@ -2918,6 +3395,34 @@ async function migrateImageUrlColumn() {
   );
 }
 
+// database/migrate-auth-tables.ts
+async function migrateAuthTables() {
+  await AppDataSource.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(32) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      role VARCHAR(16) NOT NULL DEFAULT 'operator',
+      active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await AppDataSource.query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      phone VARCHAR(32) NOT NULL,
+      email VARCHAR(255),
+      address VARCHAR(512),
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  console.log("[db] Tabelas users e customers verificadas");
+}
+
 // seeds/seed-data.ts
 var SEED_INVISIBLE_COSTS = [
   { key: "packaging", value: 0.35 },
@@ -3259,6 +3764,8 @@ async function initializeDatabase() {
     console.log("[db] PostgreSQL conectado:", host);
   }
   await migrateImageUrlColumn();
+  await migrateAuthTables();
+  await seedDefaultAdmin();
   await runSeeds();
   initialized = true;
   console.log("[db] Seeds verificados \u2014 base pronta.");
@@ -3274,7 +3781,7 @@ if (isGeminiConfigured()) {
     '[env] GEMINI_API_KEY ausente. Configure em: Configura\xE7\xF5es \u2192 Chave Gemini,\nou crie Backend/.env.local com GEMINI_API_KEY="sua-chave"'
   );
 }
-var app = (0, import_express2.default)();
+var app = (0, import_express3.default)();
 app.use((req, _res, next) => {
   if (req.url === "/" || req.url.startsWith("/?")) {
     const original = req.headers["x-vercel-original-path"] ?? req.headers["x-invoke-path"] ?? req.headers["x-forwarded-uri"];
@@ -3295,7 +3802,7 @@ app.use(
     credentials: true
   })
 );
-app.use(import_express2.default.json());
+app.use(import_express3.default.json());
 app.use((req, _res, next) => {
   console.log(`[${(/* @__PURE__ */ new Date()).toISOString()}] ${req.method} ${req.url}`);
   next();
@@ -3368,4 +3875,4 @@ if (!isVercel) {
 var server_default = app;
 
 // vercel/handler.ts
-module.exports = server_default;
+module.exports = (0, import_serverless_http.default)(server_default);
