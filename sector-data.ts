@@ -293,3 +293,97 @@ export const VAREJO_ORDERS = [
     created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
   },
 ];
+
+type VarejoPromotion = (typeof VAREJO_PROMOTIONS)[number];
+type VarejoOrder = (typeof VAREJO_ORDERS)[number];
+
+function cloneVarejoPromotions(): VarejoPromotion[] {
+  return VAREJO_PROMOTIONS.map((p) => ({ ...p }));
+}
+
+function cloneVarejoOrders(): VarejoOrder[] {
+  return VAREJO_ORDERS.map((o) => ({
+    ...o,
+    items: o.items.map((i) => ({ ...i })),
+  }));
+}
+
+let varejoPromotions: VarejoPromotion[] = cloneVarejoPromotions();
+let varejoOrders: VarejoOrder[] = cloneVarejoOrders();
+let nextVarejoOrderId = 500;
+
+export function getVarejoPromotions(): VarejoPromotion[] {
+  return varejoPromotions.map((p) => ({ ...p }));
+}
+
+export function isVarejoPromotionId(id: number): boolean {
+  return varejoPromotions.some((p) => p.id === id);
+}
+
+export function setVarejoPromotionActive(
+  id: number,
+  active: boolean
+): VarejoPromotion | null {
+  const idx = varejoPromotions.findIndex((p) => p.id === id);
+  if (idx === -1) return null;
+  varejoPromotions[idx] = { ...varejoPromotions[idx], active: active ? 1 : 0 };
+  return { ...varejoPromotions[idx] };
+}
+
+export function getVarejoOrders(): VarejoOrder[] {
+  return [...varejoOrders]
+    .map((o) => ({ ...o, items: o.items.map((i) => ({ ...i })) }))
+    .sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+}
+
+export function isVarejoOrderId(id: number): boolean {
+  return varejoOrders.some((o) => o.id === id);
+}
+
+export function createVarejoOrder(data: Record<string, unknown>): VarejoOrder {
+  const order: VarejoOrder = {
+    id: nextVarejoOrderId++,
+    customer_name: String(data.customer_name ?? ""),
+    customer_phone: String(data.customer_phone ?? ""),
+    type: String(data.type ?? "Balcão"),
+    status: String(data.status ?? "Em preparo"),
+    items: Array.isArray(data.items) ? data.items : [],
+    total_value: Number(data.total_value) || 0,
+    delivery_fee: Number(data.delivery_fee) || 0,
+    cep: String(data.cep ?? ""),
+    rua: String(data.rua ?? ""),
+    bairro: String(data.bairro ?? ""),
+    cidade: String(data.cidade ?? ""),
+    estado: String(data.estado ?? ""),
+    numero: String(data.numero ?? ""),
+    complemento: String(data.complemento ?? ""),
+    estimated_time: String(data.estimated_time ?? "40-50 min"),
+    driver_name: String(data.driver_name ?? ""),
+    driver_type: String(data.driver_type ?? "Próprio"),
+    driver_phone: String(data.driver_phone ?? ""),
+    transport_obs: String(data.transport_obs ?? ""),
+    created_at: new Date().toISOString(),
+  };
+  varejoOrders.unshift(order);
+  return { ...order, items: order.items.map((i) => ({ ...i })) };
+}
+
+export function updateVarejoOrderStatus(
+  id: number,
+  status: string
+): VarejoOrder | null {
+  const idx = varejoOrders.findIndex((o) => o.id === id);
+  if (idx === -1) return null;
+  varejoOrders[idx] = { ...varejoOrders[idx], status };
+  return {
+    ...varejoOrders[idx],
+    items: varejoOrders[idx].items.map((i) => ({ ...i })),
+  };
+}
+
+export function deleteVarejoOrder(id: number): boolean {
+  const idx = varejoOrders.findIndex((o) => o.id === id);
+  if (idx === -1) return false;
+  varejoOrders.splice(idx, 1);
+  return true;
+}

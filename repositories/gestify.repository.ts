@@ -530,7 +530,10 @@ function customerToPlain(c: {
     email: c.email,
     address: c.address,
     notes: c.notes,
-    created_at: c.created_at,
+    created_at:
+      c.created_at instanceof Date
+        ? c.created_at.toISOString()
+        : c.created_at,
   };
 }
 

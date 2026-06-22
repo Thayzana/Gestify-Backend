@@ -10,9 +10,15 @@ import {
   isVarejoTheme,
   VAREJO_PRODUCTS,
   getVarejoDashboard,
-  VAREJO_PROMOTIONS,
+  getVarejoPromotions,
+  isVarejoPromotionId,
+  setVarejoPromotionActive,
   VAREJO_SUPPLIERS,
-  VAREJO_ORDERS,
+  getVarejoOrders,
+  isVarejoOrderId,
+  createVarejoOrder,
+  updateVarejoOrderStatus,
+  deleteVarejoOrder,
 } from "./sector-data.ts";
 import { buildInsights, buildActionCards } from "./services/insights.service.ts";
 import { chatWithAssistant } from "./services/assistant.service.ts";
@@ -47,6 +53,9 @@ router.post("/orders", async (req: Request, res: Response) => {
     const body = req.body;
     if (!body.customer_name || !body.type) {
       return res.status(400).json({ error: "Nome do cliente e tipo de pedido são obrigatórios" });
+    }
+    if (isVarejoTheme(getThemeParam(req))) {
+      return res.status(201).json(createVarejoOrder(body));
     }
     const newOrder = await repo.createOrder(body);
     res.status(201).json(newOrder);
@@ -280,7 +289,7 @@ router.post("/invisible-costs", requireRole("admin"), async (req: Request, res: 
 router.get("/promotions", async (req: Request, res: Response) => {
   try {
     if (isVarejoTheme(getThemeParam(req))) {
-      return res.json(VAREJO_PROMOTIONS);
+      return res.json(getVarejoPromotions());
     }
     res.json(await repo.findAllPromotions());
   } catch (error: any) {
@@ -292,7 +301,18 @@ router.post("/promotions/:id/apply", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { active } = req.body;
-    const updated = await repo.setPromotionActive(Number(id), !!active);
+    const promoId = Number(id);
+    if (isVarejoPromotionId(promoId)) {
+      const updated = setVarejoPromotionActive(promoId, !!active);
+      if (!updated) {
+        return res.status(404).json({ error: "Promoção não encontrada." });
+      }
+      return res.json(updated);
+    }
+    const updated = await repo.setPromotionActive(promoId, !!active);
+    if (!updated) {
+      return res.status(404).json({ error: "Promoção não encontrada." });
+    }
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -416,7 +436,7 @@ router.delete("/suppliers/:id", async (req: Request, res: Response) => {
 router.get("/orders", async (req: Request, res: Response) => {
   try {
     if (isVarejoTheme(getThemeParam(req))) {
-      return res.json([...VAREJO_ORDERS].sort((a, b) => (b.id ?? 0) - (a.id ?? 0)));
+      return res.json(getVarejoOrders());
     }
     res.json(await repo.findAllOrders());
   } catch (error: any) {
@@ -431,7 +451,18 @@ router.put("/orders/:id/status", async (req: Request, res: Response) => {
     if (!status) {
       return res.status(400).json({ error: "Status é obrigatório" });
     }
-    const updated = await repo.updateOrderStatus(Number(id), status);
+    const orderId = Number(id);
+    if (isVarejoOrderId(orderId)) {
+      const updated = updateVarejoOrderStatus(orderId, status);
+      if (!updated) {
+        return res.status(404).json({ error: "Pedido não encontrado." });
+      }
+      return res.json(updated);
+    }
+    const updated = await repo.updateOrderStatus(orderId, status);
+    if (!updated) {
+      return res.status(404).json({ error: "Pedido não encontrado." });
+    }
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -451,7 +482,14 @@ router.put("/orders/:id", async (req: Request, res: Response) => {
 router.delete("/orders/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await repo.deleteOrder(Number(id));
+    const orderId = Number(id);
+    if (isVarejoOrderId(orderId)) {
+      if (!deleteVarejoOrder(orderId)) {
+        return res.status(404).json({ error: "Pedido não encontrado." });
+      }
+      return res.json({ success: true, message: `Pedido ${id} removido com sucesso` });
+    }
+    await repo.deleteOrder(orderId);
     res.json({ success: true, message: `Pedido ${id} removido com sucesso` });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
