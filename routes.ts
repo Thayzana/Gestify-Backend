@@ -23,6 +23,10 @@ import {
 import { buildInsights, buildActionCards } from "./services/insights.service.ts";
 import { chatWithAssistant } from "./services/assistant.service.ts";
 import { runAutomationCycle } from "./services/automation.service.ts";
+import {
+  estimateDeliveryTime,
+  isGoogleMapsConfigured,
+} from "./services/maps.service.ts";
 import { AppDataSource } from "./database/data-source.ts";
 import { Recipe } from "./entities/Recipe.ts";
 import authRouter from "./routes/auth.routes.ts";
@@ -61,6 +65,30 @@ router.post("/orders", async (req: Request, res: Response) => {
     res.status(201).json(newOrder);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/logistics/maps-status", (_req: Request, res: Response) => {
+  res.json({
+    googleConfigured: isGoogleMapsConfigured(),
+    storeOriginConfigured: Boolean(process.env.STORE_ORIGIN_ADDRESS?.trim()),
+  });
+});
+
+router.post("/logistics/delivery-estimate", async (req: Request, res: Response) => {
+  try {
+    const { origin, destination, destinationParts } = req.body ?? {};
+    const estimate = await estimateDeliveryTime({
+      origin: typeof origin === "string" ? origin : undefined,
+      destination: typeof destination === "string" ? destination : undefined,
+      destinationParts:
+        destinationParts && typeof destinationParts === "object"
+          ? destinationParts
+          : undefined,
+    });
+    res.json(estimate);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
