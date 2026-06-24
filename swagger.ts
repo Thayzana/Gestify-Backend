@@ -42,8 +42,19 @@ const options: swaggerJsdoc.Options = {
       { name: "Marketing", description: "Geração de copy com Gemini" },
       { name: "Fornecedores", description: "Cadastro de fornecedores" },
       { name: "Pedidos", description: "Pedidos e logística de entrega" },
+      { name: "Autenticação", description: "Controle de acesso e gerenciamento de usuários" },
+      { name: "Clientes", description: "Gerenciamento de clientes finais" },
+      { name: "Assistente IA", description: "Insights e chat operacional com Gemini" },
+      { name: "Automação", description: "Execução do ciclo de automação de vendas" },
     ],
     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
       schemas: {
         Error: {
           type: "object",
@@ -316,6 +327,62 @@ const options: swaggerJsdoc.Options = {
             top_sold: { type: "array", items: { type: "object" } },
             inactive_products: { type: "array", items: { type: "object" } },
             monthly_totals: { type: "object" },
+          },
+        },
+        User: {
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            username: { type: "string" },
+            name: { type: "string" },
+            email: { type: "string" },
+            role: { type: "string", enum: ["admin", "operator"] },
+            active: { type: "boolean" },
+            created_at: { type: "string", format: "date-time" },
+          },
+        },
+        UserInput: {
+          type: "object",
+          required: ["username", "password", "name", "email"],
+          properties: {
+            username: { type: "string" },
+            password: { type: "string" },
+            name: { type: "string" },
+            email: { type: "string" },
+            role: { type: "string", enum: ["admin", "operator"], default: "operator" },
+          },
+        },
+        UserUpdateInput: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            email: { type: "string" },
+            role: { type: "string", enum: ["admin", "operator"] },
+            active: { type: "boolean" },
+            password: { type: "string" },
+          },
+        },
+        Customer: {
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            name: { type: "string" },
+            phone: { type: "string" },
+            email: { type: "string", nullable: true },
+            address: { type: "string", nullable: true },
+            notes: { type: "string", nullable: true },
+            created_at: { type: "string", format: "date-time" },
+          },
+        },
+        CustomerInput: {
+          type: "object",
+          required: ["name", "phone"],
+          properties: {
+            name: { type: "string" },
+            phone: { type: "string" },
+            email: { type: "string", nullable: true },
+            address: { type: "string", nullable: true },
+            notes: { type: "string", nullable: true },
           },
         },
       },
@@ -900,6 +967,459 @@ const options: swaggerJsdoc.Options = {
               },
             },
             "400": errorResponse,
+            "500": errorResponse,
+          },
+        },
+      },
+      "/recipes/{id}/price": {
+        patch: {
+          tags: ["Receitas"],
+          summary: "Atualiza apenas o preço final de uma receita",
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["final_price"],
+                  properties: { final_price: { type: "number", example: 45.9 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Preço atualizado com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Recipe" },
+                },
+              },
+            },
+            "400": errorResponse,
+            "404": errorResponse,
+            "500": errorResponse,
+          },
+        },
+      },
+      "/customers": {
+        get: {
+          tags: ["Clientes"],
+          summary: "Lista todos os clientes cadastrados",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Lista de clientes",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/Customer" },
+                  },
+                },
+              },
+            },
+            "401": errorResponse,
+            "500": errorResponse,
+          },
+        },
+        post: {
+          tags: ["Clientes"],
+          summary: "Cadastra um novo cliente",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CustomerInput" },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Cliente cadastrado com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Customer" },
+                },
+              },
+            },
+            "400": errorResponse,
+            "401": errorResponse,
+          },
+        },
+      },
+      "/customers/{id}": {
+        put: {
+          tags: ["Clientes"],
+          summary: "Atualiza os dados de um cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CustomerInput" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Cliente atualizado com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Customer" },
+                },
+              },
+            },
+            "400": errorResponse,
+            "401": errorResponse,
+            "404": errorResponse,
+          },
+        },
+        delete: {
+          tags: ["Clientes"],
+          summary: "Exclui um cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: {
+            "200": {
+              description: "Cliente removido com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessMessage" },
+                },
+              },
+            },
+            "401": errorResponse,
+            "404": errorResponse,
+            "500": errorResponse,
+          },
+        },
+      },
+      "/auth/login": {
+        post: {
+          tags: ["Autenticação"],
+          summary: "Realiza o login do usuário",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["username", "password"],
+                  properties: {
+                    username: { type: "string", example: "1234" },
+                    password: { type: "string", example: "admin" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Login bem-sucedido",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      token: { type: "string" },
+                      user: { $ref: "#/components/schemas/User" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": errorResponse,
+            "401": errorResponse,
+            "500": errorResponse,
+          },
+        },
+      },
+      "/auth/register": {
+        post: {
+          tags: ["Autenticação"],
+          summary: "Cadastra um novo usuário",
+          description: "Cadastra um usuário como operador (ou administrador se for o primeiro usuário do sistema). Permissão depende se o cadastro público estiver habilitado.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UserInput" },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Usuário registrado com sucesso",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      token: { type: "string" },
+                      user: { $ref: "#/components/schemas/User" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": errorResponse,
+            "403": errorResponse,
+            "500": errorResponse,
+          },
+        },
+      },
+      "/auth/me": {
+        get: {
+          tags: ["Autenticação"],
+          summary: "Obtém dados do usuário autenticado atual",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Dados do usuário autenticado",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      user: { $ref: "#/components/schemas/User" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": errorResponse,
+          },
+        },
+      },
+      "/auth/users": {
+        get: {
+          tags: ["Autenticação"],
+          summary: "Lista todos os usuários (apenas Administradores)",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Lista de usuários",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/User" },
+                  },
+                },
+              },
+            },
+            "401": errorResponse,
+            "403": errorResponse,
+            "500": errorResponse,
+          },
+        },
+        post: {
+          tags: ["Autenticação"],
+          summary: "Cria um novo usuário (apenas Administradores)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UserInput" },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Usuário criado com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/User" },
+                },
+              },
+            },
+            "400": errorResponse,
+            "401": errorResponse,
+            "403": errorResponse,
+          },
+        },
+      },
+      "/auth/users/{id}": {
+        put: {
+          tags: ["Autenticação"],
+          summary: "Atualiza um usuário (apenas Administradores)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UserUpdateInput" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Usuário atualizado com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/User" },
+                },
+              },
+            },
+            "400": errorResponse,
+            "401": errorResponse,
+            "403": errorResponse,
+            "404": errorResponse,
+          },
+        },
+        delete: {
+          tags: ["Autenticação"],
+          summary: "Exclui um usuário (apenas Administradores)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: {
+            "200": {
+              description: "Usuário removido com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessMessage" },
+                },
+              },
+            },
+            "400": errorResponse,
+            "401": errorResponse,
+            "403": errorResponse,
+          },
+        },
+      },
+      "/assistant/insights": {
+        get: {
+          tags: ["Assistente IA"],
+          summary: "Obtém insights automatizados e action cards gerados pela IA",
+          responses: {
+            "200": {
+              description: "Insights operacionais",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      insights: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            type: { type: "string", enum: ["danger", "warning", "info"] },
+                            message: { type: "string" },
+                          },
+                        },
+                      },
+                      action_cards: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string" },
+                            title: { type: "string" },
+                            message: { type: "string" },
+                            actionLabel: { type: "string" },
+                            type: { type: "string" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "500": errorResponse,
+          },
+        },
+      },
+      "/assistant/chat": {
+        post: {
+          tags: ["Assistente IA"],
+          summary: "Conversa com o Assistente de Inteligência Artificial Gemini",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["message"],
+                  properties: {
+                    message: { type: "string", description: "Mensagem ou pergunta operacional do usuário" },
+                    history: {
+                      type: "array",
+                      description: "Histórico recente da conversa para manter o contexto",
+                      items: {
+                        type: "object",
+                        required: ["role", "text"],
+                        properties: {
+                          role: { type: "string", enum: ["user", "model"] },
+                          text: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resposta do assistente Gemini",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      reply: { type: "string" },
+                      fromAi: { type: "boolean" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": errorResponse,
+            "500": errorResponse,
+          },
+        },
+      },
+      "/automation/run": {
+        post: {
+          tags: ["Automação"],
+          summary: "Executa manualmente um ciclo completo de automação operacional",
+          description: "Roda rotinas automáticas de simulação de vendas, atualização de estoque e verificação de vencimento de lotes (Apenas Administradores).",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Ciclo de automação executado",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      logs: { type: "array", items: { type: "string" } },
+                    },
+                  },
+                },
+              },
+            },
+            "401": errorResponse,
+            "403": errorResponse,
             "500": errorResponse,
           },
         },
