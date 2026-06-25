@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { AppDataSource } from "../database/data-source.ts";
 import { User, type UserRole } from "../entities/User.ts";
 
@@ -56,39 +57,15 @@ function toAuthUser(user: User): AuthUser {
 }
 
 export function signToken(user: AuthUser): string {
-  const payload: AuthTokenPayload = {
-    ...user,
-    exp: Date.now() + TOKEN_TTL_MS,
-  };
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = crypto
-    .createHmac("sha256", getJwtSecret())
-    .update(body)
-    .digest("base64url");
-  return `${body}.${sig}`;
+  return jwt.sign(user, getJwtSecret(), { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): AuthUser | null {
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  const [body, sig] = parts;
-  const expected = crypto
-    .createHmac("sha256", getJwtSecret())
-    .update(body)
-    .digest("base64url");
   try {
-    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    const payload = jwt.verify(token, getJwtSecret()) as any;
+    if (!payload || !payload.id || !payload.username || !payload.role) {
       return null;
     }
-  } catch {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(
-      Buffer.from(body, "base64url").toString("utf8")
-    ) as AuthTokenPayload;
-    if (!payload.exp || payload.exp < Date.now()) return null;
-    if (!payload.id || !payload.username || !payload.role) return null;
     return {
       id: payload.id,
       username: payload.username,

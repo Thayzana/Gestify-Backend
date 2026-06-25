@@ -132,7 +132,7 @@ app.use("/api", async (req, res, next) => {
 
 app.use("/api", router);
 
-if (!isVercel) {
+if (!isVercel && process.env.NODE_ENV !== "test") {
   initializeDatabase()
     .then(() => {
       app.listen(PORT, "0.0.0.0", () => {

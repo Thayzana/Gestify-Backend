@@ -31,6 +31,13 @@ import { AppDataSource } from "./database/data-source.ts";
 import { Recipe } from "./entities/Recipe.ts";
 import authRouter from "./routes/auth.routes.ts";
 import { requireAuth, requireRole } from "./middleware/auth.middleware.ts";
+import { validateBody } from "./middleware/validate.middleware.ts";
+import {
+  CustomerPostSchema,
+  CustomerPutSchema,
+  PromotionPostSchema,
+  MarketingGenerateSchema,
+} from "./schemas.ts";
 
 const router = Router();
 
@@ -156,48 +163,19 @@ router.get("/customers", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/customers", async (req: Request, res: Response) => {
+router.post("/customers", requireRole("admin"), validateBody(CustomerPostSchema), async (req: Request, res: Response) => {
   try {
-    const { name, phone, email, address, notes } = req.body;
-    if (!name || !phone) {
-      return res.status(400).json({ error: "Nome e telefone são obrigatórios." });
-    }
-    const customer = await repo.createCustomer({
-      name: String(name),
-      phone: String(phone),
-      email: email ? String(email) : null,
-      address: address ? String(address) : null,
-      notes: notes ? String(notes) : null,
-    });
+    const customer = await repo.createCustomer(req.body);
     res.status(201).json(customer);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.put("/customers/:id", async (req: Request, res: Response) => {
+router.put("/customers/:id", requireRole("admin"), validateBody(CustomerPutSchema), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { name, phone, email, address, notes } = req.body ?? {};
-
-    const updateData: any = {};
-    if (name !== undefined) {
-      if (typeof name !== "string" || !name.trim()) {
-        return res.status(400).json({ error: "Nome do cliente deve ser uma string válida." });
-      }
-      updateData.name = name.trim();
-    }
-    if (phone !== undefined) {
-      if (typeof phone !== "string" || !phone.trim()) {
-        return res.status(400).json({ error: "Telefone do cliente deve ser uma string válida." });
-      }
-      updateData.phone = phone.trim();
-    }
-    if (email !== undefined) updateData.email = email ? String(email).trim() : null;
-    if (address !== undefined) updateData.address = address ? String(address).trim() : null;
-    if (notes !== undefined) updateData.notes = notes ? String(notes).trim() : null;
-
-    const updated = await repo.updateCustomer(id, updateData);
+    const updated = await repo.updateCustomer(id, req.body);
     if (!updated) return res.status(404).json({ error: "Cliente não encontrado." });
     res.json(updated);
   } catch (error: any) {
@@ -420,26 +398,18 @@ router.post("/promotions/:id/apply", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/promotions", async (req: Request, res: Response) => {
+router.post("/promotions", requireRole("admin"), validateBody(PromotionPostSchema), async (req: Request, res: Response) => {
   try {
-    const { title, subtitle, type, discount, recovery, status } = req.body;
-    const newPromo = await repo.createPromotion({
-      title, subtitle, type, discount,
-      recovery: Number(recovery || 0),
-      status: status || "Normal",
-    });
+    const newPromo = await repo.createPromotion(req.body);
     res.json(newPromo);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.post("/marketing/generate", async (req: Request, res: Response) => {
+router.post("/marketing/generate", requireRole("admin"), validateBody(MarketingGenerateSchema), async (req: Request, res: Response) => {
   try {
     const { context, type } = req.body;
-    if (!context) {
-      return res.status(400).json({ error: "Descreva o produto ou ocasião do marketing." });
-    }
 
     let prompt = "";
     if (type === "caption") {
