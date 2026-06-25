@@ -385,6 +385,47 @@ const options: swaggerJsdoc.Options = {
             notes: { type: "string", nullable: true },
           },
         },
+        AddressParts: {
+          type: "object",
+          properties: {
+            rua: { type: "string" },
+            numero: { type: "string" },
+            bairro: { type: "string" },
+            cidade: { type: "string" },
+            estado: { type: "string" },
+            cep: { type: "string" },
+          },
+        },
+        DeliveryEstimateInput: {
+          type: "object",
+          properties: {
+            origin: { type: "string" },
+            destination: { type: "string" },
+            destinationParts: { $ref: "#/components/schemas/AddressParts" },
+          },
+        },
+        DeliveryEstimateResult: {
+          type: "object",
+          properties: {
+            distanceKm: { type: "number" },
+            durationMinutes: { type: "number" },
+            drivingMinutes: { type: "number" },
+            prepBufferMinutes: { type: "number" },
+            estimatedTime: { type: "string" },
+            source: { type: "string", enum: ["google", "osrm", "fallback"] },
+            originAddress: { type: "string" },
+            destinationAddress: { type: "string" },
+            googleMapsUrl: { type: "string" },
+            wazeUrl: { type: "string" },
+          },
+        },
+        MapsStatus: {
+          type: "object",
+          properties: {
+            googleConfigured: { type: "boolean" },
+            storeOriginConfigured: { type: "boolean" },
+          },
+        },
       },
     },
     paths: {
@@ -968,6 +1009,47 @@ const options: swaggerJsdoc.Options = {
             },
             "400": errorResponse,
             "500": errorResponse,
+          },
+        },
+      },
+      "/logistics/maps-status": {
+        get: {
+          tags: ["Pedidos"],
+          summary: "Verifica o status de configuração da integração de mapas/logística",
+          responses: {
+            "200": {
+              description: "Status de configuração do Google Maps e endereço da loja",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/MapsStatus" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/logistics/delivery-estimate": {
+        post: {
+          tags: ["Pedidos"],
+          summary: "Calcula a estimativa de tempo e distância de entrega",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DeliveryEstimateInput" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Estimativa calculada com sucesso",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/DeliveryEstimateResult" },
+                },
+              },
+            },
+            "400": errorResponse,
           },
         },
       },

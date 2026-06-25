@@ -54,14 +54,68 @@ router.get("/products", async (req: Request, res: Response) => {
 
 router.post("/orders", async (req: Request, res: Response) => {
   try {
-    const body = req.body;
-    if (!body.customer_name || !body.type) {
-      return res.status(400).json({ error: "Nome do cliente e tipo de pedido são obrigatórios" });
+    const {
+      customer_name,
+      customer_phone,
+      type,
+      status,
+      items,
+      total_value,
+      delivery_fee,
+      cep,
+      rua,
+      bairro,
+      cidade,
+      estado,
+      numero,
+      complemento,
+      estimated_time,
+      driver_name,
+      driver_type,
+      driver_phone,
+      transport_obs,
+    } = req.body ?? {};
+
+    if (!customer_name || typeof customer_name !== "string" || !customer_name.trim()) {
+      return res.status(400).json({ error: "Nome do cliente é obrigatório e deve ser uma string válida." });
     }
+    if (!type || typeof type !== "string" || !type.trim()) {
+      return res.status(400).json({ error: "Tipo de pedido é obrigatório e deve ser uma string válida." });
+    }
+
+    const orderData = {
+      customer_name: customer_name.trim(),
+      customer_phone: typeof customer_phone === "string" ? customer_phone.trim() : "",
+      type: type.trim(),
+      status: typeof status === "string" ? status.trim() : "Em preparo",
+      items: Array.isArray(items)
+        ? items.map((i: any) => ({
+            id: Number(i.id || 0),
+            name: String(i.name || "").trim(),
+            quantity: Number(i.quantity || 0),
+            price: Number(i.price || 0),
+          }))
+        : [],
+      total_value: Number(total_value || 0),
+      delivery_fee: Number(delivery_fee || 0),
+      cep: typeof cep === "string" ? cep.trim() : "",
+      rua: typeof rua === "string" ? rua.trim() : "",
+      bairro: typeof bairro === "string" ? bairro.trim() : "",
+      cidade: typeof cidade === "string" ? cidade.trim() : "",
+      estado: typeof estado === "string" ? estado.trim() : "",
+      numero: typeof numero === "string" ? numero.trim() : "",
+      complemento: typeof complemento === "string" ? complemento.trim() : "",
+      estimated_time: typeof estimated_time === "string" ? estimated_time.trim() : "",
+      driver_name: typeof driver_name === "string" ? driver_name.trim() : "",
+      driver_type: typeof driver_type === "string" ? driver_type.trim() : "Próprio",
+      driver_phone: typeof driver_phone === "string" ? driver_phone.trim() : "",
+      transport_obs: typeof transport_obs === "string" ? transport_obs.trim() : "",
+    };
+
     if (isVarejoTheme(getThemeParam(req))) {
-      return res.status(201).json(createVarejoOrder(body));
+      return res.status(201).json(createVarejoOrder(orderData));
     }
-    const newOrder = await repo.createOrder(body);
+    const newOrder = await repo.createOrder(orderData);
     res.status(201).json(newOrder);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -124,7 +178,26 @@ router.post("/customers", async (req: Request, res: Response) => {
 router.put("/customers/:id", async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const updated = await repo.updateCustomer(id, req.body);
+    const { name, phone, email, address, notes } = req.body ?? {};
+
+    const updateData: any = {};
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ error: "Nome do cliente deve ser uma string válida." });
+      }
+      updateData.name = name.trim();
+    }
+    if (phone !== undefined) {
+      if (typeof phone !== "string" || !phone.trim()) {
+        return res.status(400).json({ error: "Telefone do cliente deve ser uma string válida." });
+      }
+      updateData.phone = phone.trim();
+    }
+    if (email !== undefined) updateData.email = email ? String(email).trim() : null;
+    if (address !== undefined) updateData.address = address ? String(address).trim() : null;
+    if (notes !== undefined) updateData.notes = notes ? String(notes).trim() : null;
+
+    const updated = await repo.updateCustomer(id, updateData);
     if (!updated) return res.status(404).json({ error: "Cliente não encontrado." });
     res.json(updated);
   } catch (error: any) {
@@ -172,7 +245,7 @@ router.get("/dashboard", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/products", async (req: Request, res: Response) => {
+router.post("/products", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const {
       sku, name, stock, minimum, expiration, status,
@@ -207,7 +280,7 @@ router.post("/products", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/products/:id", async (req: Request, res: Response) => {
+router.put("/products/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {
@@ -240,7 +313,7 @@ router.put("/products/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/products/:id", async (req: Request, res: Response) => {
+router.delete("/products/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await repo.deleteProduct(Number(id));
@@ -258,7 +331,7 @@ router.get("/recipes", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/recipes", async (req: Request, res: Response) => {
+router.post("/recipes", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const {
       id, name, yield: yieldCount, margin_ratio, final_price,
@@ -286,7 +359,7 @@ router.post("/recipes", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/recipes/:id", async (req: Request, res: Response) => {
+router.delete("/recipes/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await repo.deleteRecipe(Number(id));
@@ -420,7 +493,7 @@ router.get("/suppliers", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/suppliers", async (req: Request, res: Response) => {
+router.post("/suppliers", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { name, contact, category, active, items } = req.body;
     if (!name) {
@@ -435,7 +508,7 @@ router.post("/suppliers", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/suppliers/:id", async (req: Request, res: Response) => {
+router.put("/suppliers/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, contact, category, active, items } = req.body;
@@ -451,7 +524,7 @@ router.put("/suppliers/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/suppliers/:id", async (req: Request, res: Response) => {
+router.delete("/suppliers/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await repo.deleteSupplier(Number(id));
@@ -497,17 +570,69 @@ router.put("/orders/:id/status", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/orders/:id", async (req: Request, res: Response) => {
+router.put("/orders/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const updated = await repo.updateOrder(Number(id), req.body);
+    const {
+      customer_name,
+      customer_phone,
+      type,
+      status,
+      items,
+      total_value,
+      delivery_fee,
+      cep,
+      rua,
+      bairro,
+      cidade,
+      estado,
+      numero,
+      complemento,
+      estimated_time,
+      driver_name,
+      driver_type,
+      driver_phone,
+      transport_obs,
+    } = req.body ?? {};
+
+    const updateData: any = {};
+    if (customer_name !== undefined) updateData.customer_name = String(customer_name).trim();
+    if (customer_phone !== undefined) updateData.customer_phone = String(customer_phone).trim();
+    if (type !== undefined) updateData.type = String(type).trim();
+    if (status !== undefined) updateData.status = String(status).trim();
+    if (items !== undefined) {
+      updateData.items = Array.isArray(items)
+        ? items.map((i: any) => ({
+            id: Number(i.id || 0),
+            name: String(i.name || "").trim(),
+            quantity: Number(i.quantity || 0),
+            price: Number(i.price || 0),
+          }))
+        : [];
+    }
+    if (total_value !== undefined) updateData.total_value = Number(total_value || 0);
+    if (delivery_fee !== undefined) updateData.delivery_fee = Number(delivery_fee || 0);
+    if (cep !== undefined) updateData.cep = String(cep).trim();
+    if (rua !== undefined) updateData.rua = String(rua).trim();
+    if (bairro !== undefined) updateData.bairro = String(bairro).trim();
+    if (cidade !== undefined) updateData.cidade = String(cidade).trim();
+    if (estado !== undefined) updateData.estado = String(estado).trim();
+    if (numero !== undefined) updateData.numero = String(numero).trim();
+    if (complemento !== undefined) updateData.complemento = String(complemento).trim();
+    if (estimated_time !== undefined) updateData.estimated_time = String(estimated_time).trim();
+    if (driver_name !== undefined) updateData.driver_name = String(driver_name).trim();
+    if (driver_type !== undefined) updateData.driver_type = String(driver_type).trim();
+    if (driver_phone !== undefined) updateData.driver_phone = String(driver_phone).trim();
+    if (transport_obs !== undefined) updateData.transport_obs = String(transport_obs).trim();
+
+    const updated = await repo.updateOrder(Number(id), updateData);
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.delete("/orders/:id", async (req: Request, res: Response) => {
+router.delete("/orders/:id", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const orderId = Number(id);
@@ -561,7 +686,7 @@ router.post("/automation/run", requireRole("admin"), async (_req: Request, res: 
   }
 });
 
-router.patch("/recipes/:id/price", async (req: Request, res: Response) => {
+router.patch("/recipes/:id/price", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const { final_price } = req.body;

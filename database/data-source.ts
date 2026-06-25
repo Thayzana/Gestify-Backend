@@ -20,15 +20,27 @@ export function getDatabaseUrl(): string {
   );
 }
 
-export function getSslConfig(): { rejectUnauthorized: boolean } | undefined {
+export function getSslConfig(): any {
+  if (process.env.DB_SSL === "false") {
+    return undefined;
+  }
+
   const url = getDatabaseUrl();
-  if (
+  const isProdOrSupabase =
     process.env.VERCEL ||
     process.env.NODE_ENV === "production" ||
     url.includes("supabase.com") ||
-    url.includes("supabase.co")
-  ) {
-    return { rejectUnauthorized: false };
+    url.includes("supabase.co");
+
+  if (process.env.DB_SSL === "true" || isProdOrSupabase) {
+    const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false";
+    const sslOptions: any = { rejectUnauthorized };
+
+    if (process.env.DB_SSL_CA) {
+      sslOptions.ca = process.env.DB_SSL_CA;
+    }
+
+    return sslOptions;
   }
   return undefined;
 }
@@ -40,7 +52,7 @@ const poolExtra: Record<string, unknown> = {
   idleTimeoutMillis: 10_000,
 };
 if (sslConfig) {
-  poolExtra.ssl = { rejectUnauthorized: false };
+  poolExtra.ssl = sslConfig;
 }
 
 export const AppDataSource = new DataSource({
@@ -48,7 +60,7 @@ export const AppDataSource = new DataSource({
   url: getDatabaseUrl(),
   synchronize: !process.env.VERCEL,
   logging: process.env.DB_LOGGING === "true",
-  ssl: sslConfig ? true : false,
+  ssl: sslConfig ? sslConfig : false,
   extra: poolExtra,
   entities: [
     Product,

@@ -18,11 +18,13 @@ export interface AuthTokenPayload extends AuthUser {
 }
 
 function getJwtSecret(): string {
-  return (
-    process.env.JWT_SECRET ||
-    process.env.ADMIN_PASSWORD ||
-    "gestify-dev-secret-change-in-production"
-  );
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret === "gestify-dev-secret-change-in-production") {
+    throw new Error(
+      "A variável de ambiente JWT_SECRET não está configurada ou está utilizando um valor padrão inseguro."
+    );
+  }
+  return secret;
 }
 
 export function hashPassword(password: string): string {
@@ -184,8 +186,14 @@ export async function seedDefaultAdmin(): Promise<void> {
   const repo = AppDataSource.getRepository(User);
   if ((await repo.count()) > 0) return;
 
-  const username = process.env.ADMIN_USERNAME || "1164";
-  const password = process.env.ADMIN_PASSWORD || "19735";
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!username || !password) {
+    throw new Error(
+      "A base de dados de usuários está vazia, mas as variáveis de ambiente ADMIN_USERNAME ou ADMIN_PASSWORD para criação do administrador inicial não foram definidas."
+    );
+  }
 
   await repo.save(
     repo.create({
@@ -197,5 +205,5 @@ export async function seedDefaultAdmin(): Promise<void> {
       active: true,
     })
   );
-  console.log("[seed] Administrador padrão criado (username:", username, ")");
+  console.log("[seed] Administrador padrão criado com credenciais fornecidas por variáveis de ambiente.");
 }

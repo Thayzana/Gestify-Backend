@@ -9,6 +9,15 @@ import router from "./routes.ts";
 import { swaggerSpec } from "./swagger.ts";
 import { isGeminiConfigured } from "./gemini.ts";
 import { initializeDatabase } from "./database/init.ts";
+import { sanitizeMiddleware } from "./middleware/sanitize.middleware.ts";
+
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "gestify-dev-secret-change-in-production") {
+  console.error(
+    "\n[env] ERRO CRÍTICO: A variável de ambiente JWT_SECRET não está configurada ou utiliza um valor padrão inseguro.\n" +
+      "Por favor, configure JWT_SECRET no seu arquivo .env.local (desenvolvimento) ou nas configurações da sua hospedagem (produção).\n"
+  );
+  process.exit(1);
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 const isVercel = Boolean(process.env.VERCEL);
@@ -53,6 +62,20 @@ app.use(
 );
 
 app.use(express.json());
+app.use(sanitizeMiddleware);
+
+// Intercepta respostas de erro 500 para evitar vazamento de informações internas de infraestrutura
+app.use((req, res, next) => {
+  const originalJson = res.json;
+  res.json = function (body) {
+    if (res.statusCode === 500) {
+      console.error(`[500 Error at ${req.method} ${req.url}]:`, body);
+      return originalJson.call(this, { error: "Erro interno do servidor." });
+    }
+    return originalJson.call(this, body);
+  };
+  next();
+});
 
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);

@@ -52,30 +52,39 @@ export function saveGeminiApiKey(apiKey: string): void {
     throw new Error("Chave da API inválida. Cole a chave completa obtida em https://aistudio.google.com/apikey");
   }
 
-  try {
-    fs.mkdirSync(path.dirname(geminiKeyFile), { recursive: true });
-    fs.writeFileSync(geminiKeyFile, trimmed, "utf8");
+  const isServerlessOrProd = process.env.VERCEL || process.env.NODE_ENV === "production";
 
-    const envLocalPath = path.join(projectRoot, ".env.local");
-    const envLine = `GEMINI_API_KEY="${trimmed}"\n`;
-    if (fs.existsSync(envLocalPath)) {
-      const content = fs.readFileSync(envLocalPath, "utf8");
-      if (/^\s*GEMINI_API_KEY\s*=/m.test(content)) {
-        fs.writeFileSync(
-          envLocalPath,
-          content.replace(/^\s*GEMINI_API_KEY\s*=.*$/m, `GEMINI_API_KEY="${trimmed}"`),
-          "utf8"
-        );
+  if (!isServerlessOrProd) {
+    try {
+      fs.mkdirSync(path.dirname(geminiKeyFile), { recursive: true });
+      fs.writeFileSync(geminiKeyFile, trimmed, "utf8");
+
+      const envLocalPath = path.join(projectRoot, ".env.local");
+      const envLine = `GEMINI_API_KEY="${trimmed}"\n`;
+      if (fs.existsSync(envLocalPath)) {
+        const content = fs.readFileSync(envLocalPath, "utf8");
+        if (/^\s*GEMINI_API_KEY\s*=/m.test(content)) {
+          fs.writeFileSync(
+            envLocalPath,
+            content.replace(/^\s*GEMINI_API_KEY\s*=.*$/m, `GEMINI_API_KEY="${trimmed}"`),
+            "utf8"
+          );
+        } else {
+          fs.appendFileSync(envLocalPath, envLine, "utf8");
+        }
       } else {
-        fs.appendFileSync(envLocalPath, envLine, "utf8");
+        fs.writeFileSync(envLocalPath, envLine, "utf8");
       }
-    } else {
-      fs.writeFileSync(envLocalPath, envLine, "utf8");
+    } catch (err: any) {
+      console.warn(
+        "[gemini] Não foi possível salvar a chave no arquivo local (ambiente somente leitura/serverless):",
+        err.message
+      );
     }
-  } catch (err: any) {
-    console.warn(
-      "[gemini] Não foi possível salvar a chave no arquivo local (ambiente somente leitura/serverless):",
-      err.message
+  } else {
+    console.log(
+      "[gemini] Ambiente de produção/serverless detectado. A chave foi configurada apenas em memória temporária. " +
+        "Para persistência em produção, configure a variável de ambiente GEMINI_API_KEY diretamente nas configurações da hospedagem."
     );
   }
 
